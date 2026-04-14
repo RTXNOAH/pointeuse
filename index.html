@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Pointeuse</title>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #f4f4f4;
+      padding: 30px;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    button {
+      padding: 15px 25px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+    }
+
+    .in {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .out {
+      background: #f44336;
+      color: white;
+    }
+
+    .reset {
+      background: #555;
+      color: white;
+    }
+
+    #log {
+      margin-top: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      width: 300px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🕒 Pointeuse</h1>
+
+  <button class="in" onclick="pointer('ENTREE')">Pointer Entrée</button>
+  <button class="out" onclick="pointer('SORTIE')">Pointer Sortie</button>
+  <button class="reset" onclick="reset()">Effacer</button>
+
+  <div id="log"></div>
+
+  <script>
+    let logs = JSON.parse(localStorage.getItem("logs")) || [];
+
+    function afficher() {
+      let html = "<h3>Historique :</h3>";
+      if (logs.length === 0) {
+        html += "<p>Aucune donnée</p>";
+      } else {
+        logs.slice().reverse().forEach(l => {
+          html += "<p>" + l + "</p>";
+        });
+      }
+      document.getElementById("log").innerHTML = html;
+    }
+
+    function pointer(type) {
+      let now = new Date().toLocaleString();
+      logs.push(type + " - " + now);
+      localStorage.setItem("logs", JSON.stringify(logs));
+      afficher();
+    }
+
+    function reset() {
+      if (confirm("Effacer tout l'historique ?")) {
+        logs = [];
+        localStorage.removeItem("logs");
+        afficher();
+      }
+    }
+
+    afficher();
+  </script>
+
+</body>
+</html>
