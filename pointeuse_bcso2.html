@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Pointeuse BCSO</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  text-align: center;
+  padding: 40px;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 80px;
+  height: 40px;
+  margin: 20px;
+}
+
+.switch input { display: none; }
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0;
+  right: 0; bottom: 0;
+  background-color: #ef4444;
+  transition: .4s;
+  border-radius: 40px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 32px;
+  width: 32px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #22c55e;
+}
+
+input:checked + .slider:before {
+  transform: translateX(40px);
+}
+
+.box {
+  margin-top: 20px;
+}
+
+button {
+  margin-top: 10px;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#addBtn { background: #3b82f6; color: white; }
+
+.history {
+  margin-top: 20px;
+  background: #111827;
+  padding: 15px;
+  border-radius: 10px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Pointeuse BCSO</h1>
+
+<label class="switch">
+  <input type="checkbox" id="toggle">
+  <span class="slider"></span>
+</label>
+
+<p id="status">Hors service</p>
+
+<div class="box">
+  <p>Heures totales : <span id="total">0</span> min</p>
+
+  <input type="number" id="manual" placeholder="Minutes manuelles">
+  <button id="addBtn">Ajouter manuel</button>
+</div>
+
+<div class="history">
+  <h3>Historique</h3>
+  <div id="historyList"></div>
+</div>
+
+<script>
+let startTime = null;
+
+let total = localStorage.getItem("bcso_total")
+  ? parseInt(localStorage.getItem("bcso_total"))
+  : 0;
+
+let history = localStorage.getItem("bcso_history")
+  ? JSON.parse(localStorage.getItem("bcso_history"))
+  : [];
+
+document.getElementById("total").innerText = total;
+renderHistory();
+
+/* SWITCH SERVICE */
+document.getElementById("toggle").addEventListener("change", function () {
+  if (this.checked) {
+    startService();
+  } else {
+    stopService();
+  }
+});
+
+function startService() {
+  startTime = Date.now();
+  document.getElementById("status").innerText = "En service 🔵";
+}
+
+function stopService() {
+  if (!startTime) return;
+
+  let endTime = Date.now();
+  let minutes = Math.floor((endTime - startTime) / 60000);
+
+  document.getElementById("status").innerText = "Hors service 🔴";
+  startTime = null;
+
+  // ❌ ignore si moins de 1 minute
+  if (minutes < 1) return;
+
+  total += minutes;
+
+  saveHistory({
+    type: "Service",
+    start: new Date(endTime - minutes * 60000),
+    end: new Date(endTime),
+    minutes: minutes
+  });
+
+  update();
+}
+
+/* AJOUT MANUEL (DEBUT + FIN) */
+document.getElementById("addBtn").onclick = () => {
+  let val = parseInt(document.getElementById("manual").value);
+  if (!val || val <= 0) return;
+
+  let end = new Date();
+  let start = new Date(end.getTime() - val * 60000);
+
+  total += val;
+
+  saveHistory({
+    type: "Ajout manuel",
+    start: start,
+    end: end,
+    minutes: val
+  });
+
+  document.getElementById("manual").value = "";
+  update();
+};
+
+/* SAUVEGARDE */
+function saveHistory(entry) {
+  history.unshift(entry);
+  localStorage.setItem("bcso_history", JSON.stringify(history));
+}
+
+/* UPDATE */
+function update() {
+  localStorage.setItem("bcso_total", total);
+  document.getElementById("total").innerText = total;
+  renderHistory();
+}
+
+/* HISTORIQUE */
+function renderHistory() {
+  let container = document.getElementById("historyList");
+  container.innerHTML = "";
+
+  history.forEach(h => {
+    let div = document.createElement("div");
+
+    div.innerHTML = `
+      <p><b>${h.type}</b> - ${h.minutes} min</p>
+      <small>Début : ${new Date(h.start).toLocaleString()}</small><br>
+      <small>Fin : ${new Date(h.end).toLocaleString()}</small>
+      <hr>
+    `;
+
+    container.appendChild(div);
+  });
+}
+</script>
+
+</body>
+</html>
