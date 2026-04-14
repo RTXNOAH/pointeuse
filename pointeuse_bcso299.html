@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Pointeuse BCSO</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  text-align: center;
+  padding: 40px;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 80px;
+  height: 40px;
+  margin: 20px;
+}
+
+.switch input { display: none; }
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0;
+  right: 0; bottom: 0;
+  background-color: #ef4444;
+  transition: .4s;
+  border-radius: 40px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 32px;
+  width: 32px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #22c55e;
+}
+
+input:checked + .slider:before {
+  transform: translateX(40px);
+}
+
+.box {
+  margin-top: 20px;
+}
+
+button {
+  margin: 5px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#addBtn { background: #3b82f6; color: white; }
+
+.history {
+  margin-top: 20px;
+  background: #111827;
+  padding: 15px;
+  border-radius: 10px;
+  max-width: 650px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Pointeuse BCSO</h1>
+
+<!-- SWITCH -->
+<label class="switch">
+  <input type="checkbox" id="toggle">
+  <span class="slider"></span>
+</label>
+
+<p id="status">Hors service</p>
+
+<div class="box">
+  <p>Heures totales : <span id="total">0</span> min</p>
+
+  <input type="number" id="manual" placeholder="Minutes manuelles">
+  <button id="addBtn">Ajouter manuel</button>
+</div>
+
+<div class="history">
+  <h3>Historique</h3>
+  <div id="historyList"></div>
+</div>
+
+<script>
+let startTime = null;
+
+let total = localStorage.getItem("bcso_total")
+  ? parseInt(localStorage.getItem("bcso_total"))
+  : 0;
+
+let history = localStorage.getItem("bcso_history")
+  ? JSON.parse(localStorage.getItem("bcso_history"))
+  : [];
+
+document.getElementById("total").innerText = total;
+
+renderHistory();
+
+/* SWITCH SERVICE */
+document.getElementById("toggle").addEventListener("change", function () {
+  if (this.checked) startService();
+  else stopService();
+});
+
+function startService() {
+  startTime = Date.now();
+  document.getElementById("status").innerText = "En service 🔵";
+}
+
+function stopService() {
+  if (!startTime) return;
+
+  let end = new Date();
+  let minutes = Math.floor((Date.now() - startTime) / 60000);
+
+  document.getElementById("status").innerText = "Hors service 🔴";
+  startTime = null;
+
+  if (minutes < 1) return;
+
+  total += minutes;
+
+  saveHistory({
+    type: "Service",
+    start: new Date(end.getTime() - minutes * 60000),
+    end: end,
+    minutes: minutes
+  });
+
+  update();
+}
+
+/* AJOUT MANUEL */
+document.getElementById("addBtn").onclick = () => {
+  let val = parseInt(document.getElementById("manual").value);
+  if (!val || val <= 0) return;
+
+  let end = new Date();
+  let start = new Date(end.getTime() - val * 60000);
+
+  total += val;
+
+  saveHistory({
+    type: "Ajout manuel",
+    start: start,
+    end: end,
+    minutes: val
+  });
+
+  document.getElementById("manual").value = "";
+  update();
+};
+
+/* SAUVEGARDE */
+function saveHistory(entry) {
+  history.unshift(entry);
+  localStorage.setItem("bcso_history", JSON.stringify(history));
+}
+
+/* UPDATE */
+function update() {
+  localStorage.setItem("bcso_total", total);
+  document.getElementById("total").innerText = total;
+  renderHistory();
+}
+
+/* HISTORIQUE */
+function renderHistory() {
+  let container = document.getElementById("historyList");
+  container.innerHTML = "";
+
+  history.forEach((h, index) => {
+
+    let startDate = new Date(h.start);
+    let endDate = new Date(h.end);
+
+    let startText =
+      `${startDate.toLocaleDateString("fr-FR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long"
+      })} - ${startDate.toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit"
+      })}`;
+
+    let endText =
+      `${endDate.toLocaleDateString("fr-FR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long"
+      })} - ${endDate.toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit"
+      })}`;
+
+    let div = document.createElement("div");
+
+    div.innerHTML = `
+      <p><b>${h.type}</b> - ${h.minutes} min</p>
+      <p>🟢 Début : ${startText}</p>
+      <p>🔴 Fin : ${endText}</p>
+
+      <button onclick="editEntry(${index})">✏️ Modifier</button>
+      <button onclick="deleteEntry(${index})">🗑 Supprimer</button>
+
+      <hr>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+/* SUPPRIMER */
+function deleteEntry(index) {
+  let removed = history.splice(index, 1)[0];
+
+  total -= removed.minutes;
+  if (total < 0) total = 0;
+
+  localStorage.setItem("bcso_history", JSON.stringify(history));
+  localStorage.setItem("bcso_total", total);
+
+  update();
+}
+
+/* MODIFIER */
+function editEntry(index) {
+  let entry = history[index];
+
+  let newMinutes = prompt("Modifier les minutes :", entry.minutes);
+  if (!newMinutes || isNaN(newMinutes)) return;
+
+  newMinutes = parseInt(newMinutes);
+
+  let end = new Date();
+  let start = new Date(end.getTime() - newMinutes * 60000);
+
+  total = total - entry.minutes + newMinutes;
+
+  history[index] = {
+    type: entry.type,
+    start: start,
+    end: end,
+    minutes: newMinutes
+  };
+
+  localStorage.setItem("bcso_history", JSON.stringify(history));
+  localStorage.setItem("bcso_total", total);
+
+  update();
+}
+</script>
+
+</body>
+</html>
